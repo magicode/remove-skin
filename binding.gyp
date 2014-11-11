@@ -4,9 +4,9 @@
   "targets": [
     {
     
-        "target_name": "imagecmp",
+        "target_name": "removeskin",
         "sources": [ 
-            'src/image-thumb512.cc'
+            'src/remove-skin.cc'
         ],
         'libraries': [
             '-lfreeimage'
