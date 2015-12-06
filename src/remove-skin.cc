@@ -1,4 +1,4 @@
-
+#include <nan.h>
 #include <node.h>
 #include <v8.h>
 
@@ -22,7 +22,7 @@ class RemoveSkin;
 
 struct Baton {
 	uv_work_t request;
-	Persistent<Function> callback;
+	Nan::Callback *callback;
 
 	RemoveSkin* obj;
 
@@ -77,7 +77,7 @@ void RGBtoHSV( uint8_t ir, uint8_t ig, uint8_t ib, float *h, float *s, float *v 
 	}
 }
 
-static Persistent<FunctionTemplate> constructor;
+Nan::Persistent<v8::Function> constructor;
 
 class RemoveSkin: public ObjectWrap {
 public:
@@ -99,17 +99,26 @@ public:
 				cr->v0 <= v + o && cr->v1 >= v - o ;
 	}
 
-	static Handle<Value> New(const Arguments& args) {
+	static void New(const Nan::FunctionCallbackInfo<v8::Value>& args) {
+	  
+		if (!args.IsConstructCall()) {
+		  const int argc = 1; 
+		  v8::Local<v8::Value> argv[argc] = {args[0]};
+		  v8::Local<v8::Function> cons = Nan::New(constructor);
+		  args.GetReturnValue().Set(cons->NewInstance(argc, argv));
+		  return;
+		}
+		
 		RemoveSkin* obj = new RemoveSkin();
 
 		int i;
 
 		if (args.Length() < 1) {
-					return ThrowException(Exception::TypeError(String::New("Expecting 1 arguments")));
+					return Nan::ThrowError("Expecting 1 arguments");
 		}
 
 		if (!Buffer::HasInstance(args[0])) {
-			return ThrowException(Exception::TypeError(String::New("First argument must be a Buffer")));
+			return Nan::ThrowError("First argument must be a Buffer");
 		}
 
 #if NODE_MAJOR_VERSION == 0 && NODE_MINOR_VERSION < 10
@@ -126,7 +135,7 @@ public:
 		FIBITMAP * fiBitmap = FreeImage_LoadFromMemory(format, fiMemoryIn);
 
 		if(FreeImage_GetBPP(fiBitmap) != 32)
-			return ThrowException(Exception::TypeError(String::New("not have alpha channel")));
+			return Nan::ThrowError("not have alpha channel");
 
 		BYTE * bits = FreeImage_GetBits(fiBitmap);
 
@@ -170,57 +179,49 @@ public:
 		FreeImage_Unload(fiBitmap);
 
 		obj->Wrap(args.This());
-		return args.This();
+		args.GetReturnValue().Set(args.This());
 	}
-	static Handle<Value> getList(const Arguments& args) {
-		HandleScope scope;
+	static void getList(const Nan::FunctionCallbackInfo<v8::Value>& args) {
+		Nan::HandleScope scope;
 		RemoveSkin* obj = ObjectWrap::Unwrap < RemoveSkin > (args.This());
 
-		Handle<Array> array = Array::New(360);
-
+		v8::Local<v8::Array> array = Nan::New<v8::Array>(360);
+		
 		for(int i =0; i<360;i++){
-			Handle<Array> subarray = Array::New(4);
+			v8::Local<v8::Array> subarray = Nan::New<v8::Array>(4);
 			struct range* currentRange = &obj->tableSkin[i];
-			subarray->Set(0, Number::New(currentRange->s0));
-			subarray->Set(1, Number::New(currentRange->s1));
-			subarray->Set(2, Number::New(currentRange->v0));
-			subarray->Set(3, Number::New(currentRange->v1));
+			subarray->Set(0, Nan::New(currentRange->s0));
+			subarray->Set(1, Nan::New(currentRange->s1));
+			subarray->Set(2, Nan::New(currentRange->v0));
+			subarray->Set(3, Nan::New(currentRange->v1));
 			array->Set(i, subarray);
 		}
-
-
-		return scope.Close(array);
-
+		
+		args.GetReturnValue().Set(array);
+		
 	}
-	static Handle<Value> removeSkin(const Arguments& args) {
-		HandleScope scope;
-		RemoveSkin* obj = ObjectWrap::Unwrap < RemoveSkin > (args.This());
+	static void removeSkin(const Nan::FunctionCallbackInfo<v8::Value>& args) {
+		Nan::HandleScope scope;
+		RemoveSkin* obj = ObjectWrap::Unwrap<RemoveSkin> (args.This());
 
 		if (args.Length() < 2) {
-			return ThrowException(Exception::TypeError(String::New("Expecting 2 arguments")));
+			return Nan::ThrowError("Expecting 2 arguments");
 		}
 
 		if (!Buffer::HasInstance(args[0])) {
-			return ThrowException(Exception::TypeError(String::New("First argument must be a Buffer")));
+			return Nan::ThrowError("First argument must be a Buffer");
 		}
 
 		if (!args[1]->IsFunction()) {
-			return ThrowException(Exception::TypeError(String::New("Second argument must be a RemoveSkinllback function")));
+			return Nan::ThrowError("Second argument must be a RemoveSkinllback function");
 		}
 
-		Local < Function > callback = Local < Function > ::Cast(args[1]);
-
-#if NODE_MAJOR_VERSION == 0 && NODE_MINOR_VERSION < 10
-		Local < Object > buffer_obj = args[0]->ToObject();
-#else
 		Local<Value> buffer_obj = args[0];
-#endif
-
-
+		
 
 		Baton* baton = new Baton();
 		baton->request.data = baton;
-		baton->callback = Persistent < Function > ::New(callback);
+		baton->callback = new Nan::Callback( args[1].As<v8::Function>() );
 		baton->obj = obj;
 
 		/*
@@ -240,7 +241,7 @@ public:
 
 
 		assert(status == 0);
-		return Undefined();
+		args.GetReturnValue().SetUndefined();
 	}
 
 	static void DetectWork(uv_work_t* req) {
@@ -328,7 +329,7 @@ public:
 	}
 
 	static void DetectAfter(uv_work_t* req) {
-		HandleScope scope;
+		Nan::HandleScope scope;
 		Baton* baton = static_cast<Baton*>(req->data);
 
 		if (baton->fiMemoryOut) {
@@ -337,59 +338,54 @@ public:
 			int datalen;
 			FreeImage_AcquireMemory(baton->fiMemoryOut,(BYTE**)&data, (DWORD*)&datalen );
 			Local<Value> argv[argc] = {
-				Local<Value>::New( Null() ),
-				Local<Object>::New( Buffer::New(data,datalen)->handle_)
+				Nan::Null(),
+				Nan::CopyBuffer((char*)data,datalen).ToLocalChecked()
 			};
 
-			TryCatch try_catch;
-			baton->callback->Call(Context::GetCurrent()->Global(), argc, argv);
+			Nan::TryCatch try_catch;
+			baton->callback->Call(Nan::GetCurrentContext()->Global(), argc, argv);
 			if (try_catch.HasCaught())
-				FatalException(try_catch);
+				Nan::FatalException(try_catch);
 		} else {
-			Local < Value > err = Exception::Error(
-					String::New("error"));
+			Local < Value > err = Exception::Error( Nan::New("error").ToLocalChecked() );
 
 			const unsigned argc = 1;
 			Local<Value> argv[argc] = {err};
 
-			TryCatch try_catch;
-			baton->callback->Call(Context::GetCurrent()->Global(), argc, argv);
+			Nan::TryCatch try_catch;
+			baton->callback->Call(Nan::GetCurrentContext()->Global(), argc, argv);
 			if (try_catch.HasCaught())
-				FatalException(try_catch);
+				Nan::FatalException(try_catch);
 		}
 
 		if(baton->fiMemoryOut)
 			FreeImage_CloseMemory(baton->fiMemoryOut);
 
 
-		baton->callback.Dispose();
+		delete baton->callback;
 		delete baton;
 	}
 
-	static void Initialize(Handle<Object> target) {
-		HandleScope scope;
-
-		Local < FunctionTemplate > tpl = FunctionTemplate::New(New);
-		Local < String > name = String::NewSymbol("RemoveSkin");
-
-		constructor = Persistent < FunctionTemplate > ::New(tpl);
-		constructor->InstanceTemplate()->SetInternalFieldCount(1);
-		constructor->SetClassName(name);
+	static NAN_MODULE_INIT(Initialize) {
+		Nan::HandleScope scope;
+		
+		v8::Local<v8::FunctionTemplate> tpl = Nan::New<v8::FunctionTemplate>(New);
+		
+		tpl->SetClassName(Nan::New("RemoveSkin").ToLocalChecked());
+		tpl->InstanceTemplate()->SetInternalFieldCount(1);
 
 
-		NODE_SET_PROTOTYPE_METHOD(constructor, "removeSkin", removeSkin);
-		NODE_SET_PROTOTYPE_METHOD(constructor, "getList", getList);
+		Nan::SetPrototypeMethod(tpl, "removeSkin", removeSkin);
+		Nan::SetPrototypeMethod(tpl, "getList", getList);
 
-		target->Set(name, constructor->GetFunction());
+		Nan::Set(target, Nan::New("RemoveSkin").ToLocalChecked(), Nan::GetFunction(tpl).ToLocalChecked());
 
 	}
 };
 
-extern "C" {
-	void init(Handle<Object> target) {
-		HandleScope scope;
-		RemoveSkin::Initialize(target);
-	}
-
-	NODE_MODULE(removeskin, init);
+NAN_MODULE_INIT(init) {
+	RemoveSkin::Initialize(target);
 }
+
+NODE_MODULE(removeskin, init);
+

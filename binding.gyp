@@ -10,7 +10,10 @@
         ],
         'libraries': [
             '-lfreeimage'
-        ]
+        ],
+        "include_dirs": [
+    	  "<!(node -e \"require('nan')\")"
+    	]
     }
     
   ]

@@ -1,8 +1,11 @@
 {
   "name": "remove-skin",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "",
   "main": "index.js",
   "license": "",
-  "gypfile": true
+  "gypfile": true,
+  "dependencies": {
+    "nan": "^2.1.0"
+  }
 }

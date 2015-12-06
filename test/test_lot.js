@@ -16,7 +16,7 @@ function test(){
 	
 		removeskin.removeSkin(bufimg,function(err,buffer){
 			count++;
-			if(Date.now() > d + 1000000){
+			if(Date.now() > d + 10000){
 				console.log("count: "+ count);
 				return;
 			}
