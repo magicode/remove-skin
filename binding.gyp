@@ -8,12 +8,13 @@
         "sources": [ 
             'src/remove-skin.cc'
         ],
-        'libraries': [
-            '-lfreeimage'
-        ],
-        "include_dirs": [
-    	  "<!(node -e \"require('nan')\")"
-    	]
+       "include_dirs" : [
+	    "<!(node -e \"require('nan')\")",
+	    "<!(node -e \"require('free-image-lib/include_dirs')\")"
+       ],
+       "libraries": [
+	    "../<!(node -e \"require('free-image-lib/libraries')\")"
+       ]
     }
     
   ]
