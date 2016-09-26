@@ -79,6 +79,10 @@ void RGBtoHSV( uint8_t ir, uint8_t ig, uint8_t ib, float *h, float *s, float *v 
 
 Nan::Persistent<v8::Function> constructor;
 
+typedef struct {
+	u_int32_t b24:24;
+} uint32to24;
+
 class RemoveSkin: public ObjectWrap {
 public:
 
@@ -86,7 +90,9 @@ public:
 	~RemoveSkin() {}
 
 	struct range tableSkin[361];
-
+	
+	uint32_t colorSet = 0x00ffffff;
+	
 	bool isSkin(uint8_t r,uint8_t g,uint8_t b){
 		float o = 0.10;
 		float h ,s ,v;
@@ -98,7 +104,8 @@ public:
 				cr->s0 <= s + o && cr->s1 >= s - o  &&
 				cr->v0 <= v + o && cr->v1 >= v - o ;
 	}
-
+	
+	
 	static void New(const Nan::FunctionCallbackInfo<v8::Value>& args) {
 	  
 		if (!args.IsConstructCall()) {
@@ -177,7 +184,13 @@ public:
 
 
 		FreeImage_Unload(fiBitmap);
-
+		
+		
+		if(args.Length() > 1 && !args[1]->IsUndefined()){
+			obj->colorSet = args[1]->IntegerValue();
+		}
+		
+		
 		obj->Wrap(args.This());
 		args.GetReturnValue().Set(args.This());
 	}
@@ -247,21 +260,34 @@ public:
 	static void DetectWork(uv_work_t* req) {
 
 		Baton* baton = static_cast<Baton*>(req->data);
-		uint i;
-		RemoveSkin* obj = baton->obj;
-
-		FIMEMORY * fiMemoryIn = baton->fiMemoryIn;//FreeImage_OpenMemory((BYTE *)baton->imageBuffer,baton->imageBufferLength);
-		FREE_IMAGE_FORMAT format = FreeImage_GetFileTypeFromMemory(fiMemoryIn);
-
-
-
-		FIBITMAP * fiBitmap = FreeImage_LoadFromMemory(format, fiMemoryIn);
+		uint i, bpp , pitch;
+		int h;
+		RemoveSkin* obj;
+		
+		FIMEMORY * fiMemoryIn , * fiMemoryOut;
+		FIBITMAP * fiBitmap , * tmpImage;
+		FREE_IMAGE_FORMAT format ;
+		
+		obj = baton->obj;
+		
+		fiMemoryIn = baton->fiMemoryIn;//FreeImage_OpenMemory((BYTE *)baton->imageBuffer,baton->imageBufferLength);
+		format = FreeImage_GetFileTypeFromMemory(fiMemoryIn);
+		
+		if (format < 0)
+			goto ret;
+		
+		fiBitmap = FreeImage_LoadFromMemory(format, fiMemoryIn);
 		FreeImage_CloseMemory(fiMemoryIn);
+		
+		
+		if (!fiBitmap)
+			goto ret;
+		
 		//FIBITMAP * thumbnail = FreeImage_MakeThumbnail(fiBitmap, 32, TRUE);
 
 		//RGBQUAD rgba;
 		//int w = FreeImage_GetWidth(fiBitmap);
-		int h = FreeImage_GetHeight(fiBitmap);
+		h = FreeImage_GetHeight(fiBitmap);
 /*
  * for(int y =0;y<h;y++){
 			for(int x =0;x<w;x++){
@@ -274,41 +300,55 @@ public:
 		}
 */
 		//uint8_t * bits = (uint8_t *)FreeImage_GetBits(fiBitmap);
-		uint bpp = FreeImage_GetBPP(fiBitmap);
+		bpp = FreeImage_GetBPP(fiBitmap);
 		//uint bitsLength = FreeImage_GetWidth(fiBitmap) * FreeImage_GetHeight(fiBitmap) * (bpp/8);
 		//uint bitsLength = (FreeImage_GetPitch(fiBitmap) * (FreeImage_GetHeight(fiBitmap))) ;
-		uint pitch = FreeImage_GetPitch(fiBitmap);
+		pitch = FreeImage_GetPitch(fiBitmap);
 
 		//printf("bpp %d\n",bpp);
 
+		
+		if(bpp != 32 && bpp != 24){
+			tmpImage = FreeImage_ConvertTo32Bits(fiBitmap);
+			FreeImage_Unload(fiBitmap);
+			fiBitmap = tmpImage;
+		}
+		
+		
 		if(bpp == 32){
 			for(int y =0; y<h ;y++){
 				BYTE *bitss = FreeImage_GetScanLine(fiBitmap, y);
 				for (i = 0; i < pitch; i += 4) {
 					if(obj->isSkin(bitss[i+2] , bitss[i+1] , bitss[i]))
-						bitss[i] = bitss[i+1] = bitss[i+2] = bitss[i+3] = 0;
+						*((uint32_t *)&bitss[i]) = obj->colorSet;
 				}
 			}
 		}
+		
 		if(bpp == 24){
 			for(int y =0;y<h;y++){
 				BYTE *bitss = FreeImage_GetScanLine(fiBitmap, y);
 				for (i = 0; i < pitch; i += 3) {
 					if(obj->isSkin( bitss[i+2], bitss[i+1] ,bitss[i] )){
-						bitss[i] = bitss[i+1] = bitss[i+2] = 0xff;
+						(*((uint32to24 *)&bitss[i])).b24 = obj->colorSet;
 					}
 				}
 			}
 		}
-
-		FIMEMORY * fiMemoryOut = FreeImage_OpenMemory();
+		
+		fiMemoryOut  = FreeImage_OpenMemory();
 
 		FreeImage_SaveToMemory(format, fiBitmap, fiMemoryOut, 0);
 
-		FreeImage_Unload(fiBitmap);
-
+		
+		
 		baton->fiMemoryOut =  fiMemoryOut;
-
+		
+		ret:
+		
+		if(fiBitmap)
+			FreeImage_Unload(fiBitmap);
+		
 		//FreeImage_Unload(thumbnail);
 
 

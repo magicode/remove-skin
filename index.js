@@ -10,10 +10,10 @@ var addon = require('./build/Release/removeskin');
 var fs = require('fs');
 
 
-module.exports.create = function(bufimg){
+module.exports.create = function(bufimg,color){
 	if(!bufimg)
 		bufimg = fs.readFileSync(__dirname + '/skins.png');
-	return new addon.RemoveSkin(bufimg);
+	return new addon.RemoveSkin(bufimg,color);
 };
 
 
