@@ -13,7 +13,7 @@ removeskin.removeSkin(bufimg,function(err,buffer){
 	console.log(err);
 	console.log(buffer);
 	
-	fs.writeFileSync(__dirname + '/imaget1.png',buffer);
+	fs.writeFileSync(__dirname + '/imaget1.jpg',buffer);
 });
 
 

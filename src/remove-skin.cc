@@ -264,8 +264,8 @@ public:
 		int h;
 		RemoveSkin* obj;
 		
-		FIMEMORY * fiMemoryIn , * fiMemoryOut;
-		FIBITMAP * fiBitmap , * tmpImage;
+		FIMEMORY * fiMemoryIn = NULL , * fiMemoryOut =  NULL;
+		FIBITMAP * fiBitmap = NULL , * tmpImage =  NULL;
 		FREE_IMAGE_FORMAT format ;
 		
 		obj = baton->obj;
@@ -283,37 +283,20 @@ public:
 		if (!fiBitmap)
 			goto ret;
 		
-		//FIBITMAP * thumbnail = FreeImage_MakeThumbnail(fiBitmap, 32, TRUE);
-
-		//RGBQUAD rgba;
-		//int w = FreeImage_GetWidth(fiBitmap);
 		h = FreeImage_GetHeight(fiBitmap);
-/*
- * for(int y =0;y<h;y++){
-			for(int x =0;x<w;x++){
-				FreeImage_GetPixelColor(fiBitmap,x,y,&rgba);
-				if(obj->isSkin(rgba.rgbRed , rgba.rgbGreen , rgba.rgbBlue)){
-					rgba.rgbBlue = rgba.rgbGreen=rgba.rgbRed=rgba.rgbReserved = 0xff;
-					FreeImage_SetPixelColor(fiBitmap,x,y,&rgba);
-				}
-			}
-		}
-*/
-		//uint8_t * bits = (uint8_t *)FreeImage_GetBits(fiBitmap);
+ 
 		bpp = FreeImage_GetBPP(fiBitmap);
-		//uint bitsLength = FreeImage_GetWidth(fiBitmap) * FreeImage_GetHeight(fiBitmap) * (bpp/8);
-		//uint bitsLength = (FreeImage_GetPitch(fiBitmap) * (FreeImage_GetHeight(fiBitmap))) ;
+ 
 		pitch = FreeImage_GetPitch(fiBitmap);
 
-		//printf("bpp %d\n",bpp);
-
-		
-		if(bpp != 32 && bpp != 24){
+		//printf("bpp %d , format %d\n",bpp, format);
+                
+		if(bpp != 32 || bpp != 24){
 			tmpImage = FreeImage_ConvertTo32Bits(fiBitmap);
 			FreeImage_Unload(fiBitmap);
 			fiBitmap = tmpImage;
+                        bpp = 32;
 		}
-		
 		
 		if(bpp == 32){
 			for(int y =0; y<h ;y++){
@@ -336,6 +319,21 @@ public:
 			}
 		}
 		
+                if( FIF_JPEG == format ){
+			tmpImage = FreeImage_ConvertTo24Bits(fiBitmap);
+			FreeImage_Unload(fiBitmap);
+			fiBitmap = tmpImage;
+			bpp = 24;
+                }
+
+                
+                if( bpp == 24 && FIF_PNG == format ){
+			tmpImage = FreeImage_ConvertTo32Bits(fiBitmap);
+			FreeImage_Unload(fiBitmap);
+			fiBitmap = tmpImage;
+			bpp = 32;
+                }
+                
 		fiMemoryOut  = FreeImage_OpenMemory();
 
 		FreeImage_SaveToMemory(format, fiBitmap, fiMemoryOut, 0);
@@ -348,24 +346,7 @@ public:
 		
 		if(fiBitmap)
 			FreeImage_Unload(fiBitmap);
-		
-		//FreeImage_Unload(thumbnail);
-
-
-		/*
-		fipMemoryIO* memin = new fipMemoryIO((BYTE*)baton->imageBuffer,baton->imageBufferLength);
-		FREE_IMAGE_FORMAT format = fipImage::identifyFIFFromMemory((FIMEMORY*)memin);
-
-		fipImage* image = new fipImage();
-
-		image->loadFromMemory((fipMemoryIO&)memin);
-
-		fipMemoryIO* memout = new fipMemoryIO();
-
-		image->saveToMemory(format,(fipMemoryIO&)memout);
-
-		memout->acquire((BYTE**)&baton->imageResult, (DWORD*)&baton->imageResultLength);
-		*/
+                
 	}
 
 	static void DetectAfter(uv_work_t* req) {
