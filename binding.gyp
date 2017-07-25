@@ -6,7 +6,7 @@
     
         "target_name": "removeskin",
         "sources": [ 
-            'src/remove-skin.cc'
+            'remove-skin.cc'
         ],
        "include_dirs" : [
 	    "<!(node -e \"require('nan')\")",
