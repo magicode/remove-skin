@@ -278,6 +278,7 @@ public:
 		
 		fiBitmap = FreeImage_LoadFromMemory(format, fiMemoryIn);
 		FreeImage_CloseMemory(fiMemoryIn);
+		fiMemoryIn = NULL;
 		
 		
 		if (!fiBitmap)
@@ -287,7 +288,6 @@ public:
  
 		bpp = FreeImage_GetBPP(fiBitmap);
  
-		pitch = FreeImage_GetPitch(fiBitmap);
 
 		//printf("bpp %d , format %d\n",bpp, format);
                 
@@ -299,6 +299,7 @@ public:
 		}
 		
 		if(bpp == 32){
+			pitch = FreeImage_GetPitch(fiBitmap);
 			for(int y =0; y<h ;y++){
 				BYTE *bitss = FreeImage_GetScanLine(fiBitmap, y);
 				for (i = 0; i < pitch; i += 4) {
@@ -309,6 +310,7 @@ public:
 		}
 		
 		if(bpp == 24){
+			pitch = FreeImage_GetPitch(fiBitmap);
 			for(int y =0;y<h;y++){
 				BYTE *bitss = FreeImage_GetScanLine(fiBitmap, y);
 				for (i = 0; i < pitch; i += 3) {
@@ -319,21 +321,20 @@ public:
 			}
 		}
 		
-                if( FIF_JPEG == format ){
+                if(bpp == 32 && FIF_JPEG == format ){
 			tmpImage = FreeImage_ConvertTo24Bits(fiBitmap);
 			FreeImage_Unload(fiBitmap);
 			fiBitmap = tmpImage;
 			bpp = 24;
-                }
+		}
 
-                
-                if( bpp == 24 && FIF_PNG == format ){
+		if( bpp == 24 && FIF_PNG == format ){
 			tmpImage = FreeImage_ConvertTo32Bits(fiBitmap);
 			FreeImage_Unload(fiBitmap);
 			fiBitmap = tmpImage;
 			bpp = 32;
-                }
-                
+		}
+
 		fiMemoryOut  = FreeImage_OpenMemory();
 
 		FreeImage_SaveToMemory(format, fiBitmap, fiMemoryOut, 0);
@@ -346,7 +347,9 @@ public:
 		
 		if(fiBitmap)
 			FreeImage_Unload(fiBitmap);
-                
+
+		if(fiMemoryIn)
+			FreeImage_CloseMemory(fiMemoryIn); 
 	}
 
 	static void DetectAfter(uv_work_t* req) {
