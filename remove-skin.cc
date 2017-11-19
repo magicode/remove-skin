@@ -267,11 +267,12 @@ public:
 		FIMEMORY * fiMemoryIn = NULL , * fiMemoryOut =  NULL;
 		FIBITMAP * fiBitmap = NULL , * tmpImage =  NULL;
 		FREE_IMAGE_FORMAT format ;
-		
+		FREE_IMAGE_FORMAT outformat ;
+
 		obj = baton->obj;
 		
 		fiMemoryIn = baton->fiMemoryIn;//FreeImage_OpenMemory((BYTE *)baton->imageBuffer,baton->imageBufferLength);
-		format = FreeImage_GetFileTypeFromMemory(fiMemoryIn);
+		outformat = format = FreeImage_GetFileTypeFromMemory(fiMemoryIn);
 		
 		if (format < 0)
 			goto ret;
@@ -291,15 +292,16 @@ public:
 
 		//printf("bpp %d , format %d\n",bpp, format);
                 
-		if(bpp != 32 || bpp != 24){
+		if(bpp != 32 && bpp != 24){
 			tmpImage = FreeImage_ConvertTo32Bits(fiBitmap);
 			FreeImage_Unload(fiBitmap);
 			fiBitmap = tmpImage;
                         bpp = 32;
 		}
 		
+		pitch = FreeImage_GetPitch(fiBitmap);
+		
 		if(bpp == 32){
-			pitch = FreeImage_GetPitch(fiBitmap);
 			for(int y =0; y<h ;y++){
 				BYTE *bitss = FreeImage_GetScanLine(fiBitmap, y);
 				for (i = 0; i < pitch; i += 4) {
@@ -310,7 +312,6 @@ public:
 		}
 		
 		if(bpp == 24){
-			pitch = FreeImage_GetPitch(fiBitmap);
 			for(int y =0;y<h;y++){
 				BYTE *bitss = FreeImage_GetScanLine(fiBitmap, y);
 				for (i = 0; i < pitch; i += 3) {
@@ -334,12 +335,15 @@ public:
 			fiBitmap = tmpImage;
 			bpp = 32;
 		}
-
+		
+		
+		if(outformat != FIF_PNG && outformat != FIF_JPEG && outformat != FIF_WEBP){
+			outformat = FIF_PNG;
+		}
+		
 		fiMemoryOut  = FreeImage_OpenMemory();
 
-		FreeImage_SaveToMemory(format, fiBitmap, fiMemoryOut, 0);
-
-		
+		FreeImage_SaveToMemory(outformat, fiBitmap, fiMemoryOut, 0);
 		
 		baton->fiMemoryOut =  fiMemoryOut;
 		
